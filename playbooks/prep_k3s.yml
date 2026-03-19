@@ -1,0 +1,24 @@
+---
+- name: Prepare Ubuntu Nodes for K3s
+  hosts: all
+  become: true
+  tasks:
+    - name: Update apt cache and upgrade packages
+      apt:
+        update_cache: yes
+        upgrade: dist
+
+    - name: Install required dependencies
+      apt:
+        name: [curl, nfs-common, jq]
+        state: present
+
+    - name: Disable Swap (Required for K8s)
+      command: swapoff -a
+      when: ansible_swaptotal_mb > 0
+
+    - name: Remove Swap from fstab
+      replace:
+        path: /etc/fstab
+        regexp: '^([^#].*?\sswap\s+.*)$'
+        replace: '# \1'

@@ -1,0 +1,35 @@
+---
+- name: Build my K3s Lab
+  hosts: all
+  become: true
+  vars:
+    # --- JUST PUT YOUR MASTER IP HERE ---
+    k3s_master_ip: "192.168.5.40" 
+
+  tasks:
+    - name: Ensure curl is installed
+      apt:
+        name: curl
+        state: present
+        update_cache: yes
+
+    - name: Install K3s Server on the Master node
+      shell: curl -sfL https://get.k3s.io | sh -
+      when: inventory_hostname == k3s_master_ip
+      args:
+        creates: /usr/local/bin/k3s
+
+    - name: Get K3s Node Token from Master
+      slurp:
+        src: /var/lib/rancher/k3s/server/node-token
+      register: node_token_encoded
+      delegate_to: "{{ k3s_master_ip }}"
+      run_once: true
+
+    - name: Install K3s on Agents and join Cluster
+      shell: >
+        curl -sfL https://get.k3s.io | K3S_URL=https://{{ k3s_master_ip }}:6443 
+        K3S_TOKEN={{ node_token_encoded['content'] | b64decode | trim }} sh -
+      when: inventory_hostname != k3s_master_ip
+      args:
+        creates: /usr/local/bin/k3s
